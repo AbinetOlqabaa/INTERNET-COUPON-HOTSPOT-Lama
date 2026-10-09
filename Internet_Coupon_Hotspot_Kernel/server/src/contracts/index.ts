@@ -90,7 +90,7 @@ export type SessionState = z.infer<typeof SessionStateSchema>;
 export const VALID_SESSION_TRANSITIONS: Record<SessionState, SessionState[]> = {
   created: ['awaiting_payment', 'cancelled'],
   awaiting_payment: ['payment_verified', 'cancelled'],
-  payment_verified: ['activation_pending', 'refund_pending'],
+  payment_verified: ['activation_pending', 'active', 'refund_pending'],
   activation_pending: ['active', 'activation_failed', 'refund_pending'],
   active: ['expired', 'paused', 'revoked', 'refund_pending', 'disputed'],
   paused: ['active', 'expired', 'revoked'],

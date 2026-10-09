@@ -10,6 +10,11 @@ import type {
   LedgerEntryEntity,
   AuditEventEntity,
   PasswordResetTokenEntity,
+  GatewayEntity,
+  NotificationEntity,
+  LoyaltyBadgeEntity,
+  BonusGrantEntity,
+  AIProviderEntity,
 } from './schema.js';
 
 export interface RepositoryRegistry {
@@ -18,10 +23,14 @@ export interface RepositoryRegistry {
   packages: PackageRepository;
   coupons: CouponRepository;
   sessions: SessionRepository;
+  gateways: GatewayRepository;
   payments: PaymentRepository;
   ledger: LedgerRepository;
   audit: AuditRepository;
   passwordResets: PasswordResetRepository;
+  notifications: NotificationRepository;
+  loyalty: LoyaltyRepository;
+  aiProviders: AIProviderRepository;
   runTransaction<T>(work: () => Promise<T>): Promise<T>;
 }
 
@@ -57,7 +66,11 @@ export interface CustomerRepository {
     limit?: number,
     offset?: number
   ): Promise<{ customers: CustomerEntity[]; totalCount: number }>;
-  create(customer: Omit<CustomerEntity, 'id' | 'createdAt' | 'updatedAt'>): Promise<CustomerEntity>;
+  create(
+    customer: Omit<CustomerEntity, 'id' | 'createdAt' | 'updatedAt' | 'dataRetentionConsent'> & {
+      dataRetentionConsent?: boolean;
+    }
+  ): Promise<CustomerEntity>;
   update(ownerId: string, id: string, patch: Partial<CustomerEntity>): Promise<CustomerEntity | null>;
   delete(ownerId: string, id: string): Promise<boolean>;
 }
@@ -79,15 +92,26 @@ export interface CouponRepository {
 
 export interface SessionRepository {
   findById(ownerId: string, id: string): Promise<SessionEntity | null>;
+  findByIdPublic(id: string): Promise<SessionEntity | null>;
   list(ownerId: string, status?: string): Promise<SessionEntity[]>;
   listByCustomer(ownerId: string, customerId: string): Promise<SessionEntity[]>;
+  listAllActive(): Promise<SessionEntity[]>;
   create(session: Omit<SessionEntity, 'id' | 'createdAt' | 'updatedAt'>): Promise<SessionEntity>;
+  update(ownerId: string, id: string, patch: Partial<SessionEntity>): Promise<SessionEntity | null>;
   updateStatus(
     ownerId: string,
     id: string,
     status: SessionEntity['status'],
     timestamps?: { activatedAt?: string; expiresAt?: string }
   ): Promise<SessionEntity | null>;
+}
+
+export interface GatewayRepository {
+  findById(ownerId: string, id: string): Promise<GatewayEntity | null>;
+  list(ownerId: string): Promise<GatewayEntity[]>;
+  create(gateway: Omit<GatewayEntity, 'id' | 'createdAt' | 'updatedAt'>): Promise<GatewayEntity>;
+  update(ownerId: string, id: string, patch: Partial<GatewayEntity>): Promise<GatewayEntity | null>;
+  delete(ownerId: string, id: string): Promise<boolean>;
 }
 
 export interface PaymentRepository {
@@ -123,6 +147,53 @@ export interface AuditRepository {
   list(ownerId: string, limit?: number): Promise<AuditEventEntity[]>;
 }
 
+export interface NotificationRepository {
+  create(
+    data: Omit<NotificationEntity, 'id' | 'createdAt' | 'updatedAt' | 'deliveryAttempts' | 'status'> & {
+      deliveryAttempts?: number;
+      status?: NotificationEntity['status'];
+    }
+  ): Promise<NotificationEntity>;
+  findById(id: string): Promise<NotificationEntity | null>;
+  list(
+    ownerId: string,
+    options?: {
+      status?: string;
+      recipientType?: string;
+      recipientId?: string;
+      unreadOnly?: boolean;
+      limit?: number;
+    }
+  ): Promise<NotificationEntity[]>;
+  listByRecipient(recipientId: string, limit?: number): Promise<NotificationEntity[]>;
+  update(id: string, patch: Partial<NotificationEntity>): Promise<NotificationEntity | null>;
+  markDelivered(id: string): Promise<NotificationEntity | null>;
+  markFailed(id: string): Promise<NotificationEntity | null>;
+  markRead(id: string): Promise<NotificationEntity | null>;
+}
+
+export interface LoyaltyRepository {
+  listBadges(ownerId: string, customerId: string): Promise<LoyaltyBadgeEntity[]>;
+  awardBadge(badge: Omit<LoyaltyBadgeEntity, 'id' | 'awardedAt'>): Promise<LoyaltyBadgeEntity>;
+  createBonus(bonus: Omit<BonusGrantEntity, 'id' | 'createdAt' | 'updatedAt'>): Promise<BonusGrantEntity>;
+  listBonuses(ownerId: string, customerId?: string, status?: string): Promise<BonusGrantEntity[]>;
+  findBonusById(ownerId: string, id: string): Promise<BonusGrantEntity | null>;
+  updateBonusStatus(
+    ownerId: string,
+    id: string,
+    status: BonusGrantEntity['status'],
+    claimedAt?: string
+  ): Promise<BonusGrantEntity | null>;
+}
+
+export interface AIProviderRepository {
+  list(ownerId: string): Promise<AIProviderEntity[]>;
+  findById(ownerId: string, id: string): Promise<AIProviderEntity | null>;
+  create(provider: Omit<AIProviderEntity, 'id' | 'createdAt' | 'updatedAt'>): Promise<AIProviderEntity>;
+  update(ownerId: string, id: string, patch: Partial<AIProviderEntity>): Promise<AIProviderEntity | null>;
+  delete(ownerId: string, id: string): Promise<boolean>;
+}
+
 /**
  * In-Memory Database Implementation for standalone execution & unit testing
  */
@@ -132,10 +203,15 @@ export class MemoryDatabase implements RepositoryRegistry {
   private packagesMap = new Map<string, PackageEntity>();
   private couponsMap = new Map<string, CouponEntity>();
   private sessionsMap = new Map<string, SessionEntity>();
+  private gatewaysMap = new Map<string, GatewayEntity>();
   private paymentsMap = new Map<string, PaymentIntentEntity>();
   private ledgerEntries: LedgerEntryEntity[] = [];
   private auditEvents: AuditEventEntity[] = [];
   private passwordResetsMap = new Map<string, PasswordResetTokenEntity>();
+  private notificationsMap = new Map<string, NotificationEntity>();
+  private badgesList: LoyaltyBadgeEntity[] = [];
+  private bonusesMap = new Map<string, BonusGrantEntity>();
+  private aiProvidersMap = new Map<string, AIProviderEntity>();
 
   async runTransaction<T>(work: () => Promise<T>): Promise<T> {
     return await work();
@@ -300,6 +376,7 @@ export class MemoryDatabase implements RepositoryRegistry {
       const now = new Date().toISOString();
       const customer: CustomerEntity = {
         ...data,
+        dataRetentionConsent: data.dataRetentionConsent ?? true,
         id: randomUUID(),
         createdAt: now,
         updatedAt: now,
@@ -408,6 +485,9 @@ export class MemoryDatabase implements RepositoryRegistry {
       const s = this.sessionsMap.get(id);
       return s && s.ownerId === ownerId ? s : null;
     },
+    findByIdPublic: async (id) => {
+      return this.sessionsMap.get(id) ?? null;
+    },
     list: async (ownerId, status) => {
       return Array.from(this.sessionsMap.values()).filter(
         (s) => s.ownerId === ownerId && (!status || s.status === status)
@@ -417,6 +497,9 @@ export class MemoryDatabase implements RepositoryRegistry {
       return Array.from(this.sessionsMap.values()).filter(
         (s) => s.ownerId === ownerId && s.customerId === customerId
       );
+    },
+    listAllActive: async () => {
+      return Array.from(this.sessionsMap.values()).filter((s) => s.status === 'active');
     },
     create: async (data) => {
       const now = new Date().toISOString();
@@ -429,6 +512,17 @@ export class MemoryDatabase implements RepositoryRegistry {
       this.sessionsMap.set(session.id, session);
       return session;
     },
+    update: async (ownerId, id, patch) => {
+      const session = await this.sessions.findById(ownerId, id);
+      if (!session) return null;
+      const updated: SessionEntity = {
+        ...session,
+        ...patch,
+        updatedAt: new Date().toISOString(),
+      };
+      this.sessionsMap.set(id, updated);
+      return updated;
+    },
     updateStatus: async (ownerId, id, status, timestamps) => {
       const session = await this.sessions.findById(ownerId, id);
       if (!session) return null;
@@ -437,6 +531,44 @@ export class MemoryDatabase implements RepositoryRegistry {
       if (timestamps?.expiresAt) session.expiresAt = timestamps.expiresAt;
       session.updatedAt = new Date().toISOString();
       return session;
+    },
+  };
+
+  gateways: GatewayRepository = {
+    findById: async (ownerId, id) => {
+      const g = this.gatewaysMap.get(id);
+      return g && g.ownerId === ownerId ? g : null;
+    },
+    list: async (ownerId) => {
+      return Array.from(this.gatewaysMap.values()).filter((g) => g.ownerId === ownerId);
+    },
+    create: async (data) => {
+      const now = new Date().toISOString();
+      const gateway: GatewayEntity = {
+        ...data,
+        id: randomUUID(),
+        createdAt: now,
+        updatedAt: now,
+      };
+      this.gatewaysMap.set(gateway.id, gateway);
+      return gateway;
+    },
+    update: async (ownerId, id, patch) => {
+      const g = await this.gateways.findById(ownerId, id);
+      if (!g) return null;
+      const updated: GatewayEntity = {
+        ...g,
+        ...patch,
+        updatedAt: new Date().toISOString(),
+      };
+      this.gatewaysMap.set(id, updated);
+      return updated;
+    },
+    delete: async (ownerId, id) => {
+      const g = await this.gateways.findById(ownerId, id);
+      if (!g) return false;
+      this.gatewaysMap.delete(id);
+      return true;
     },
   };
 
@@ -579,6 +711,206 @@ export class MemoryDatabase implements RepositoryRegistry {
         .filter((e) => e.ownerId === ownerId)
         .slice(-limit)
         .reverse();
+    },
+  };
+
+  notifications: NotificationRepository = {
+    create: async (data) => {
+      const now = new Date().toISOString();
+      const n: NotificationEntity = {
+        ...data,
+        id: randomUUID(),
+        metadata: data.metadata ?? {},
+        status: data.status ?? 'pending',
+        deliveryAttempts: data.deliveryAttempts ?? 0,
+        maxAttempts: data.maxAttempts ?? 3,
+        lastAttemptAt: data.lastAttemptAt ?? null,
+        deliveredAt: data.deliveredAt ?? null,
+        readAt: data.readAt ?? null,
+        createdAt: now,
+        updatedAt: now,
+      };
+      this.notificationsMap.set(n.id, n);
+      return n;
+    },
+    findById: async (id) => this.notificationsMap.get(id) ?? null,
+    list: async (ownerId, options) => {
+      let list = Array.from(this.notificationsMap.values()).filter((n) => n.ownerId === ownerId);
+      if (options?.status) {
+        list = list.filter((n) => n.status === options.status);
+      }
+      if (options?.recipientType) {
+        list = list.filter((n) => n.recipientType === options.recipientType);
+      }
+      if (options?.recipientId) {
+        list = list.filter((n) => n.recipientId === options.recipientId);
+      }
+      if (options?.unreadOnly) {
+        list = list.filter((n) => n.status !== 'read');
+      }
+      list.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+      if (options?.limit) {
+        list = list.slice(0, options.limit);
+      }
+      return list;
+    },
+    listByRecipient: async (recipientId, limit = 50) => {
+      return Array.from(this.notificationsMap.values())
+        .filter((n) => n.recipientId === recipientId)
+        .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+        .slice(0, limit);
+    },
+    update: async (id, patch) => {
+      const n = this.notificationsMap.get(id);
+      if (!n) return null;
+      const updated: NotificationEntity = {
+        ...n,
+        ...patch,
+        updatedAt: new Date().toISOString(),
+      };
+      this.notificationsMap.set(id, updated);
+      return updated;
+    },
+    markDelivered: async (id) => {
+      const n = this.notificationsMap.get(id);
+      if (!n) return null;
+      const now = new Date().toISOString();
+      const updated: NotificationEntity = {
+        ...n,
+        status: 'delivered',
+        deliveredAt: now,
+        deliveryAttempts: n.deliveryAttempts + 1,
+        lastAttemptAt: now,
+        updatedAt: now,
+      };
+      this.notificationsMap.set(id, updated);
+      return updated;
+    },
+    markFailed: async (id) => {
+      const n = this.notificationsMap.get(id);
+      if (!n) return null;
+      const now = new Date().toISOString();
+      const updated: NotificationEntity = {
+        ...n,
+        status: 'failed',
+        deliveryAttempts: n.deliveryAttempts + 1,
+        lastAttemptAt: now,
+        updatedAt: now,
+      };
+      this.notificationsMap.set(id, updated);
+      return updated;
+    },
+    markRead: async (id) => {
+      const n = this.notificationsMap.get(id);
+      if (!n) return null;
+      const now = new Date().toISOString();
+      const updated: NotificationEntity = {
+        ...n,
+        status: 'read',
+        readAt: now,
+        updatedAt: now,
+      };
+      this.notificationsMap.set(id, updated);
+      return updated;
+    },
+  };
+
+  loyalty: LoyaltyRepository = {
+    listBadges: async (ownerId, customerId) => {
+      return this.badgesList.filter((b) => b.ownerId === ownerId && b.customerId === customerId);
+    },
+    awardBadge: async (badge) => {
+      const existing = this.badgesList.find(
+        (b) => b.ownerId === badge.ownerId && b.customerId === badge.customerId && b.badgeCode === badge.badgeCode
+      );
+      if (existing) return existing;
+      const entity: LoyaltyBadgeEntity = {
+        ...badge,
+        id: randomUUID(),
+        awardedAt: new Date().toISOString(),
+      };
+      this.badgesList.push(entity);
+      return entity;
+    },
+    createBonus: async (bonus) => {
+      const now = new Date().toISOString();
+      const entity: BonusGrantEntity = {
+        ...bonus,
+        id: randomUUID(),
+        status: bonus.status ?? 'active',
+        claimedAt: null,
+        createdAt: now,
+        updatedAt: now,
+      };
+      this.bonusesMap.set(entity.id, entity);
+      return entity;
+    },
+    listBonuses: async (ownerId, customerId, status) => {
+      return Array.from(this.bonusesMap.values())
+        .filter((b) => {
+          if (b.ownerId !== ownerId) return false;
+          if (customerId && b.customerId !== customerId) return false;
+          if (status && b.status !== status) return false;
+          return true;
+        })
+        .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    },
+    findBonusById: async (ownerId, id) => {
+      const b = this.bonusesMap.get(id);
+      if (!b || b.ownerId !== ownerId) return null;
+      return b;
+    },
+    updateBonusStatus: async (ownerId, id, status, claimedAt) => {
+      const b = this.bonusesMap.get(id);
+      if (!b || b.ownerId !== ownerId) return null;
+      const updated: BonusGrantEntity = {
+        ...b,
+        status,
+        claimedAt: claimedAt ?? b.claimedAt,
+        updatedAt: new Date().toISOString(),
+      };
+      this.bonusesMap.set(id, updated);
+      return updated;
+    },
+  };
+
+  aiProviders: AIProviderRepository = {
+    list: async (ownerId) => {
+      return Array.from(this.aiProvidersMap.values())
+        .filter((p) => p.ownerId === ownerId)
+        .sort((a, b) => a.priority - b.priority);
+    },
+    findById: async (ownerId, id) => {
+      const p = this.aiProvidersMap.get(id);
+      if (!p || p.ownerId !== ownerId) return null;
+      return p;
+    },
+    create: async (provider) => {
+      const now = new Date().toISOString();
+      const entity: AIProviderEntity = {
+        ...provider,
+        id: randomUUID(),
+        createdAt: now,
+        updatedAt: now,
+      };
+      this.aiProvidersMap.set(entity.id, entity);
+      return entity;
+    },
+    update: async (ownerId, id, patch) => {
+      const p = this.aiProvidersMap.get(id);
+      if (!p || p.ownerId !== ownerId) return null;
+      const updated: AIProviderEntity = {
+        ...p,
+        ...patch,
+        updatedAt: new Date().toISOString(),
+      };
+      this.aiProvidersMap.set(id, updated);
+      return updated;
+    },
+    delete: async (ownerId, id) => {
+      const p = this.aiProvidersMap.get(id);
+      if (!p || p.ownerId !== ownerId) return false;
+      return this.aiProvidersMap.delete(id);
     },
   };
 }

@@ -151,3 +151,113 @@ export const PasswordResetTokenEntitySchema = z.object({
   createdAt: z.string().datetime(),
 });
 export type PasswordResetTokenEntity = z.infer<typeof PasswordResetTokenEntitySchema>;
+
+export const GatewayEntitySchema = z.object({
+  id: z.string().uuid(),
+  ownerId: z.string().uuid(),
+  name: z.string().min(1).max(64),
+  mode: z.enum(['limited_owner_mode', 'managed_gateway_mode']).default('limited_owner_mode'),
+  adapterType: z.string().min(1).default('limited_owner'),
+  host: z.string().nullable().optional(),
+  port: z.number().int().nullable().optional(),
+  apiKeyEncrypted: z.string().nullable().optional(),
+  status: z.enum(['online', 'offline', 'unmanaged']).default('unmanaged'),
+  lastSeenAt: z.string().datetime().nullable().optional(),
+  createdAt: z.string().datetime(),
+  updatedAt: z.string().datetime(),
+});
+export type GatewayEntity = z.infer<typeof GatewayEntitySchema>;
+
+export const NotificationEntitySchema = z.object({
+  id: z.string().uuid(),
+  ownerId: z.string().uuid(),
+  recipientType: z.enum(['customer', 'owner', 'portal']),
+  recipientId: z.string().min(1),
+  channel: z.enum(['in_app', 'portal_toast', 'webhook', 'sms_mock', 'email_mock']),
+  template: z.enum([
+    'session_expiring',
+    'payment_confirmed',
+    'package_purchased',
+    'voucher_redeemed',
+    'quota_warning',
+    'security_alert',
+    'system',
+  ]),
+  title: z.string().min(1).max(128),
+  message: z.string().min(1).max(500),
+  metadata: z.record(z.string(), z.unknown()).default({}),
+  status: z.enum(['pending', 'delivered', 'failed', 'read']).default('pending'),
+  deliveryAttempts: z.number().int().nonnegative().default(0),
+  maxAttempts: z.number().int().positive().default(3),
+  lastAttemptAt: z.string().datetime().nullable().optional(),
+  deliveredAt: z.string().datetime().nullable().optional(),
+  readAt: z.string().datetime().nullable().optional(),
+  createdAt: z.string().datetime(),
+  updatedAt: z.string().datetime(),
+});
+export type NotificationEntity = z.infer<typeof NotificationEntitySchema>;
+
+export const CustomerSegmentSchema = z.enum(['VIP', 'REGULAR', 'AT_RISK', 'NEW']);
+export type CustomerSegment = z.infer<typeof CustomerSegmentSchema>;
+
+export const LoyaltyBadgeEntitySchema = z.object({
+  id: z.string().uuid(),
+  ownerId: z.string().uuid(),
+  customerId: z.string().uuid(),
+  badgeCode: z.enum(['EARLY_ADOPTER', 'LOYAL_STREAMER', 'WEEKEND_WARRIOR', 'COMMUNITY_REGULAR']),
+  name: z.string().min(1),
+  criteriaEvidence: z.record(z.string(), z.unknown()).default({}),
+  awardedAt: z.string().datetime(),
+});
+export type LoyaltyBadgeEntity = z.infer<typeof LoyaltyBadgeEntitySchema>;
+
+export const BonusGrantEntitySchema = z.object({
+  id: z.string().uuid(),
+  ownerId: z.string().uuid(),
+  customerId: z.string().uuid(),
+  bonusType: z.enum(['free_minutes', 'discount_voucher']),
+  amountUnits: z.number().int().positive(),
+  budgetDeductionMinor: z.number().int().nonnegative(),
+  currency: CurrencyCodeSchema,
+  status: z.enum(['active', 'claimed', 'expired', 'revoked']).default('active'),
+  expiresAt: z.string().datetime(),
+  claimedAt: z.string().datetime().nullable().optional(),
+  auditReason: z.string().min(1),
+  createdBy: z.string().min(1),
+  createdAt: z.string().datetime(),
+  updatedAt: z.string().datetime(),
+});
+export type BonusGrantEntity = z.infer<typeof BonusGrantEntitySchema>;
+
+export const AIProviderEntitySchema = z.object({
+  id: z.string().uuid(),
+  ownerId: z.string().uuid(),
+  provider: z.enum(['gemini', 'groq', 'ollama', 'openai_compatible']),
+  model: z.string().min(1),
+  type: z.enum(['hosted', 'local']),
+  endpoint: z.string().nullable().optional(),
+  apiKeyEncrypted: z.string().nullable().optional(),
+  maskedKey: z.string().default('none'),
+  capabilities: z.array(z.string()).default(['chat', 'summarization', 'forecast', 'anomalies']),
+  isFreeTier: z.boolean().default(true),
+  priority: z.number().int().default(1),
+  enabled: z.boolean().default(true),
+  timeoutMs: z.number().int().positive().default(8000),
+  monthlyBudgetCents: z.number().int().nonnegative().default(0),
+  currentSpendCents: z.number().int().nonnegative().default(0),
+  health: z.enum(['healthy', 'degraded', 'rate_limited', 'unreachable']).default('healthy'),
+  quotaEvidence: z.object({
+    remainingRequests: z.number().int().optional(),
+    resetAt: z.string().optional(),
+    source: z.enum(['official_header', 'observed_429', 'estimated']).default('estimated'),
+  }).default({ source: 'estimated' }),
+  privacyPolicy: z.object({
+    allowTelemetry: z.boolean().default(true),
+    redactCustomerPii: z.boolean().default(true),
+  }).default({ allowTelemetry: true, redactCustomerPii: true }),
+  createdAt: z.string().datetime(),
+  updatedAt: z.string().datetime(),
+});
+export type AIProviderEntity = z.infer<typeof AIProviderEntitySchema>;
+
+

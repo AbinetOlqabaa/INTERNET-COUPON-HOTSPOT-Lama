@@ -1,6 +1,40 @@
 # Changelog and Evidence
 
-## Authentication, Multi-User RBAC, Administration & AI Telemetry Foundation (Completed)
+## Phase 8, 9, 10 & 11 — Sessions State Machine, Gateway Adapters & Customer Portal (Completed)
+- Built Server-Authoritative Session Engine (`server/src/sessions/service.ts` & `routes.ts`):
+  - Authoritative UTC timestamps for `activatedAt` and `expiresAt` with server-enforced duration clocks.
+  - Resolved `VALID_SESSION_TRANSITIONS` state table in `server/src/contracts/index.ts` to allow direct activation from verified payment states (`payment_verified` -> `active`).
+  - Implemented session operations: `POST /api/v1/sessions` (creation), `POST /api/v1/sessions/:id/activate` (activation), `POST /api/v1/sessions/:id/extend` (extension), `POST /api/v1/sessions/:id/pause` (administrative pause with frozen remaining seconds), `POST /api/v1/sessions/:id/resume` (resume with recalculated expiry timestamp), and `POST /api/v1/sessions/:id/revoke` (administrative revocation).
+  - Passive & automated expiry reconciliation: `POST /api/v1/sessions/reconcile-expiry`.
+  - Built Operator Sessions UI (`client/src/components/SessionsView.tsx`): live 1-second dynamic countdown clocks, status filters, manual session creator, extension modal, pause/resume, and administrative revocation.
+- Built Gateway Adapter Layer & Honest Network Architecture (`server/src/gateway/`):
+  - `LimitedOwnerGatewayAdapter` for standard Android OS hotspot with honest disclosures (`canDisconnectClient: false`, `canLimitBandwidth: false`, `canMeasureTraffic: false`).
+  - `MockTestGatewayAdapter` clearly marked `TEST ONLY` providing validated simulation of authoritative disconnections and byte counters.
+  - Implemented Gateway routes: `GET /api/v1/gateways` (list & capabilities), `POST /api/v1/gateways` (registration), `GET /api/v1/gateways/:id/health` (health probe), `GET /api/v1/gateways/:id/accounting/:mac` (traffic accounting), `POST /api/v1/gateways/:id/disconnect` (client disconnection), and `POST /api/v1/gateways/events` (webhook ingestion).
+  - Built Operator Gateways UI (`client/src/components/GatewaysView.tsx`): explicit architectural cards distinguishing unmanaged Android hotspots from managed hardware routers, hardware acceptance disclosure ("Physical hardware router integration NOT TESTED on physical device; verified with Mock Test Gateway adapter"), and diagnostic harness.
+- Built Customer Captive Portal & Self-Service Experience (`client/src/components/CustomerPortalView.tsx`):
+  - Voucher redemption directly into active sessions: `POST /api/v1/sessions/redeem`.
+  - Public captive portal status polling without authentication leakage: `GET /api/v1/sessions/public/:id`.
+  - Mobile-responsive customer captive portal with real-time remaining time countdown clock, package info, and step-by-step connection guides.
+- Evidence & Verification:
+  - 73/73 tests passing across 14 test suites in vitest:
+    - `server/src/sessions/sessions.test.ts` (10 tests)
+    - `server/src/gateway/gateway.test.ts` (6 tests)
+    - `server/src/payments/payments.test.ts` (10 tests)
+    - `server/src/admin/admin.test.ts` (6 tests)
+    - `server/src/auth/password_lifecycle.test.ts` (4 tests)
+    - `server/src/customers/customers.test.ts` (4 tests)
+    - `server/src/auth/auth.test.ts` (5 tests)
+    - `server/src/packages/packages.test.ts` (3 tests)
+    - `server/src/coupons/coupons.test.ts` (3 tests)
+    - `server/src/owner/owner.test.ts` (2 tests)
+    - `server/src/app.test.ts` (2 tests)
+    - `server/src/contracts/contracts.test.ts` (7 tests)
+    - `server/src/db/db.test.ts` (6 tests)
+    - `client/src/theme.test.ts` (5 tests)
+  - TypeScript compilation checks (`tsc --noEmit`): 0 errors across workspace.
+  - Production build (`npm run build`): Clean build.
+  - Dev server responding on port 3000 to `/api/v1/health` and serving the SPA.
 - Built authentication & session security engine in `server/src/auth/service.ts`:
   - PBKDF2/SHA-512 password hashing with random 16-byte salt, 10,000 iterations, 64-byte key length.
   - Timing-safe comparison preventing timing leakage attacks.

@@ -1,6 +1,26 @@
 # Current Implementation Status
 
-Checkpoint: Phase 7 (Payment Adapters, Sandbox, Signed Webhooks, Manual Cash, Ledger & Reconciliation) AND Comprehensive Authentication, Multi-User RBAC, Administration & AI Telemetry Foundation Verified. Next: Phase 8 (Session State Machine, Expiry & Gateway Reconciliation).
+Checkpoint: Phase 8 (Session State Machine & Expiry Clocks), Phase 9 & 10 (Gateway Adapters, Health & Hardware Disclosures), and Phase 11 (Customer Portal & Voucher Redemption) Verified. Next: Phase 12 (In-App/Portal Notifications) & Phase 13 (Analytics).
+
+- Phase 11 (Customer Captive Portal & Self-Service Experience):
+  - Mobile-responsive customer portal view (`client/src/components/CustomerPortalView.tsx`) optimized for Android phones and tablets. [IMPLEMENTED, INTEGRATION-TESTED]
+  - Voucher / coupon code redemption (`POST /api/v1/sessions/redeem`) linking vouchers directly to active access sessions with device MAC binding. [IMPLEMENTED, UNIT-TESTED, INTEGRATION-TESTED]
+  - Live customer countdown timer with seconds precision, polling public status (`GET /api/v1/sessions/public/:id`) without authentication leaks. [IMPLEMENTED, UNIT-TESTED, INTEGRATION-TESTED]
+  - Clear user onboarding instructions and network connection guides. [IMPLEMENTED, INTEGRATION-TESTED]
+
+- Phase 9 & 10 (Gateway Adapters, Discovery, Health & Network Reality):
+  - Pluggable gateway adapter architecture (`server/src/gateway/adapters/`): `LimitedOwnerGatewayAdapter` and `MockTestGatewayAdapter` (clearly marked TEST ONLY). [IMPLEMENTED, UNIT-TESTED]
+  - Honest gateway disclosures in UI and API: Mode A (Android hotspot unmanaged) vs Mode B (hardware router managed with RADIUS/RouterOS/OpenWrt). [IMPLEMENTED, UNIT-TESTED, INTEGRATION-TESTED]
+  - Gateway diagnostics & telemetry panel (`client/src/components/GatewaysView.tsx`): health probe (`GET /api/v1/gateways/:id/health`), client traffic accounting (`GET /api/v1/gateways/:id/accounting/:mac`), and disconnect command dispatch (`POST /api/v1/gateways/:id/disconnect`). [IMPLEMENTED, UNIT-TESTED, INTEGRATION-TESTED]
+  - Gateway event webhook callback ingestion (`POST /api/v1/gateways/events`). [IMPLEMENTED, UNIT-TESTED]
+  - Hardware acceptance disclosure: Physical hardware router integration NOT TESTED on physical device; verified via validated Mock Test Gateway adapter. [DISCLOSED]
+
+- Phase 8 (Server-Authoritative Session State Machine, Duration Clocks & Reconcile):
+  - Authoritative UTC timestamps for `activatedAt` and `expiresAt` with server-enforced duration clocks (`SessionService` in `server/src/sessions/service.ts`). [IMPLEMENTED, UNIT-TESTED]
+  - Live session monitor with real-time dynamic countdown clocks (`client/src/components/SessionsView.tsx`). [IMPLEMENTED, INTEGRATION-TESTED]
+  - Session lifecycle operations: activation (`POST /api/v1/sessions/:id/activate`), duration extension (`POST /api/v1/sessions/:id/extend`), administrative pause (`POST /api/v1/sessions/:id/pause`), administrative resume (`POST /api/v1/sessions/:id/resume`), and administrative revocation (`POST /api/v1/sessions/:id/revoke`). [IMPLEMENTED, UNIT-TESTED, INTEGRATION-TESTED]
+  - Automated & manual passive expiry reconciliation (`POST /api/v1/sessions/reconcile-expiry`). [IMPLEMENTED, UNIT-TESTED]
+  - Strict tenant isolation and audit event logging for all session state transitions. [IMPLEMENTED, UNIT-TESTED]
 
 - Authentication, RBAC, Multi-User & Administrator Console:
   - Polished responsive login view (`client/src/components/AuthView.tsx`) with brand logo, mode switching (Sign In, Register, Forgot Password, Reset Password, Admin Bootstrap), password visibility toggle, accessible labels, loading/error states. [IMPLEMENTED, UNIT-TESTED, INTEGRATION-TESTED]
@@ -49,7 +69,9 @@ Checkpoint: Phase 7 (Payment Adapters, Sandbox, Signed Webhooks, Manual Cash, Le
   - Integer minor units, state machine transitions, gateway capability matrix, secret redaction. [IMPLEMENTED, UNIT-TESTED]
 
 - Tests & Tooling:
-  - Total test count: 57 passed across 12 test files [UNIT-TESTED]
+  - Total test count: 73 passed across 14 test files [UNIT-TESTED, ALL PASSING]
+    - `server/src/sessions/sessions.test.ts` (10 tests)
+    - `server/src/gateway/gateway.test.ts` (6 tests)
     - `server/src/payments/payments.test.ts` (10 tests)
     - `server/src/admin/admin.test.ts` (6 tests)
     - `server/src/auth/password_lifecycle.test.ts` (4 tests)
@@ -66,8 +88,8 @@ Checkpoint: Phase 7 (Payment Adapters, Sandbox, Signed Webhooks, Manual Cash, Le
   - Production builds (`npm run build`): Clean build [UNIT-TESTED]
 
 - Hardware Disclosures & Verification:
-  - Gateway enforcement / Hardware router integration: NOT TESTED (disclosed honestly in UI & `/api/v1/health`).
+  - Gateway enforcement / Hardware router integration: NOT TESTED on physical device; verified with Mock Test Gateway adapter.
   - Android packaging / Physical device: NOT TESTED (Phase 17).
   - External Third-Party Card Gateways (Stripe live API, M-Pesa live API): NOT TESTED (Sandbox & Manual Cash Verified; live credentials required).
 
-Next: Phase 8 — Server-authoritative session state machine, duration clocks, expiry timers, extensions, pause/revoke, and gateway reconciliation.
+Next: Phase 12 — In-App / Local / Portal Notifications where technically supported; delivery states, retry, and operational alerts.

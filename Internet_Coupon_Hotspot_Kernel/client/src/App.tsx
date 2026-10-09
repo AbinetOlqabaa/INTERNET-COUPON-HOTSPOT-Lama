@@ -1,6 +1,13 @@
 import React, { useEffect, useState } from 'react';
 import { AuthView } from './components/AuthView.js';
 import { LogoutModal } from './components/LogoutModal.js';
+import { SessionsView } from './components/SessionsView.js';
+import { GatewaysView } from './components/GatewaysView.js';
+import { CustomerPortalView } from './components/CustomerPortalView.js';
+import { AnalyticsView } from './components/AnalyticsView.js';
+import { LoyaltyView } from './components/LoyaltyView.js';
+import { AICopilotView } from './components/AICopilotView.js';
+import { NotificationsModal } from './components/NotificationsModal.js';
 
 const API = import.meta.env.VITE_API_BASE_URL ?? '';
 
@@ -34,10 +41,26 @@ interface AdminOverviewData {
 export function App() {
   const [token, setToken] = useState<string | null>(() => localStorage.getItem('hotspot_auth_token'));
   const [user, setUser] = useState<UserProfile | null>(null);
-  const [activeTab, setActiveTab] = useState<'overview' | 'customers' | 'packages' | 'coupons' | 'payments' | 'users' | 'audit' | 'ai' | 'security'>('overview');
+  const [activeTab, setActiveTab] = useState<
+    | 'overview'
+    | 'sessions'
+    | 'gateways'
+    | 'portal'
+    | 'customers'
+    | 'packages'
+    | 'coupons'
+    | 'payments'
+    | 'analytics'
+    | 'loyalty'
+    | 'users'
+    | 'audit'
+    | 'ai'
+    | 'security'
+  >('overview');
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const [isLogoutModalOpen, setIsLogoutModalOpen] = useState(false);
+  const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
   const [logoutLoading, setLogoutLoading] = useState(false);
 
   // Live Data States
@@ -146,7 +169,7 @@ export function App() {
         .catch(() => {});
     }
 
-    if (activeTab === 'packages') {
+    if (activeTab === 'sessions' || activeTab === 'packages') {
       fetch(`${API}/api/v1/packages`, { headers })
         .then((r) => r.ok ? r.json() : null)
         .then((d) => d && setPackages(d.packages))
@@ -537,6 +560,22 @@ export function App() {
           </button>
           <button
             type="button"
+            className={`nav-item ${activeTab === 'sessions' ? 'active' : ''}`}
+            onClick={() => { setActiveTab('sessions'); setMobileSidebarOpen(false); }}
+          >
+            <span className="nav-icon">⏱️</span>
+            {!sidebarCollapsed && <span>Live Sessions</span>}
+          </button>
+          <button
+            type="button"
+            className={`nav-item ${activeTab === 'gateways' ? 'active' : ''}`}
+            onClick={() => { setActiveTab('gateways'); setMobileSidebarOpen(false); }}
+          >
+            <span className="nav-icon">🌐</span>
+            {!sidebarCollapsed && <span>Gateways &amp; Network</span>}
+          </button>
+          <button
+            type="button"
             className={`nav-item ${activeTab === 'customers' ? 'active' : ''}`}
             onClick={() => { setActiveTab('customers'); setMobileSidebarOpen(false); }}
           >
@@ -567,6 +606,38 @@ export function App() {
             <span className="nav-icon">💳</span>
             {!sidebarCollapsed && <span>Payments &amp; Ledger</span>}
           </button>
+          <button
+            type="button"
+            className={`nav-item ${activeTab === 'analytics' ? 'active' : ''}`}
+            onClick={() => { setActiveTab('analytics'); setMobileSidebarOpen(false); }}
+          >
+            <span className="nav-icon">📈</span>
+            {!sidebarCollapsed && <span>Analytics &amp; Reports</span>}
+          </button>
+          <button
+            type="button"
+            className={`nav-item ${activeTab === 'loyalty' ? 'active' : ''}`}
+            onClick={() => { setActiveTab('loyalty'); setMobileSidebarOpen(false); }}
+          >
+            <span className="nav-icon">⭐</span>
+            {!sidebarCollapsed && <span>Loyalty &amp; Segments</span>}
+          </button>
+          <button
+            type="button"
+            className={`nav-item ${activeTab === 'portal' ? 'active' : ''}`}
+            onClick={() => { setActiveTab('portal'); setMobileSidebarOpen(false); }}
+          >
+            <span className="nav-icon">📱</span>
+            {!sidebarCollapsed && <span>Customer Portal</span>}
+          </button>
+          <button
+            type="button"
+            className={`nav-item ${activeTab === 'ai' ? 'active' : ''}`}
+            onClick={() => { setActiveTab('ai'); setMobileSidebarOpen(false); }}
+          >
+            <span className="nav-icon">🤖</span>
+            {!sidebarCollapsed && <span>AI Copilot &amp; Providers</span>}
+          </button>
 
           {canAccessAdmin && (
             <>
@@ -586,14 +657,6 @@ export function App() {
               >
                 <span className="nav-icon">📜</span>
                 {!sidebarCollapsed && <span>Audit Trail</span>}
-              </button>
-              <button
-                type="button"
-                className={`nav-item ${activeTab === 'ai' ? 'active' : ''}`}
-                onClick={() => { setActiveTab('ai'); setMobileSidebarOpen(false); }}
-              >
-                <span className="nav-icon">🤖</span>
-                {!sidebarCollapsed && <span>AI Operations</span>}
               </button>
             </>
           )}
@@ -630,18 +693,32 @@ export function App() {
             </button>
             <span style={{ fontWeight: 700, fontSize: '0.95rem' }}>
               {activeTab === 'overview' && 'Operations Dashboard'}
+              {activeTab === 'sessions' && 'Live Sessions & Traffic Accounting'}
+              {activeTab === 'gateways' && 'Network Gateways & Hardware Telemetry'}
               {activeTab === 'customers' && 'Customer Management'}
               {activeTab === 'packages' && 'Access Packages Catalog'}
               {activeTab === 'coupons' && 'Coupons & Vouchers Engine'}
               {activeTab === 'payments' && 'Financial Ledger, Cash Desk & Payment Processing'}
+              {activeTab === 'analytics' && 'Analytics, Usage & Revenue Reports'}
+              {activeTab === 'loyalty' && 'Customer Loyalty & Explainable Segments'}
+              {activeTab === 'portal' && 'Customer Access Portal Simulation'}
               {activeTab === 'users' && 'Administration • User Management'}
               {activeTab === 'audit' && 'Security & Operational Audit Logs'}
-              {activeTab === 'ai' && 'AI-Assisted Operations & Telemetry'}
+              {activeTab === 'ai' && 'AI Operations Copilot & Provider Registry'}
               {activeTab === 'security' && 'Account Security & Password'}
             </span>
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+            <button
+              type="button"
+              className="btn-outline"
+              style={{ padding: '0.35rem 0.65rem', fontSize: '0.85rem' }}
+              onClick={() => setIsNotificationsOpen(true)}
+              title="System Notifications & Alerts"
+            >
+              🔔 Alerts
+            </button>
             <span className={`badge ${user.role === 'SUPER_ADMIN' ? 'badge-super-admin' : user.role === 'OWNER' ? 'badge-owner' : 'badge-staff'}`}>
               {user.role}
             </span>
@@ -792,6 +869,48 @@ export function App() {
                 </p>
               </aside>
             </div>
+          )}
+
+          {/* TAB: SESSIONS */}
+          {activeTab === 'sessions' && (
+            <SessionsView
+              token={token!}
+              packages={packages}
+              onFeedback={(msg, type) => setFeedback({ message: msg, type })}
+            />
+          )}
+
+          {/* TAB: GATEWAYS */}
+          {activeTab === 'gateways' && (
+            <GatewaysView
+              token={token!}
+              onFeedback={(msg, type) => setFeedback({ message: msg, type })}
+            />
+          )}
+
+          {/* TAB: CUSTOMER PORTAL */}
+          {activeTab === 'portal' && (
+            <CustomerPortalView
+              ownerId={user?.id}
+              businessName={user?.businessName}
+              onFeedback={(msg, type) => setFeedback({ message: msg, type })}
+            />
+          )}
+
+          {/* TAB: ANALYTICS & REPORTS */}
+          {activeTab === 'analytics' && (
+            <AnalyticsView
+              token={token!}
+              onFeedback={(msg, type) => setFeedback({ message: msg, type: type === 'ok' ? 'success' : 'error' })}
+            />
+          )}
+
+          {/* TAB: LOYALTY & SEGMENTS */}
+          {activeTab === 'loyalty' && (
+            <LoyaltyView
+              token={token!}
+              onFeedback={(msg, type) => setFeedback({ message: msg, type: type === 'ok' ? 'success' : 'error' })}
+            />
           )}
 
           {/* TAB 2: CUSTOMERS */}

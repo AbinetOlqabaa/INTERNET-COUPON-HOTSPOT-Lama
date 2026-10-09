@@ -12,6 +12,18 @@ import { createCouponRouter } from './coupons/routes.js';
 import { createAdminRouter } from './admin/routes.js';
 import { PaymentService } from './payments/service.js';
 import { createPaymentRouter } from './payments/routes.js';
+import { GatewayService } from './gateway/service.js';
+import { createGatewayRouter } from './gateway/routes.js';
+import { SessionService } from './sessions/service.js';
+import { createSessionRouter } from './sessions/routes.js';
+import { NotificationService } from './notifications/service.js';
+import { createNotificationRouter } from './notifications/routes.js';
+import { AnalyticsService } from './analytics/service.js';
+import { createAnalyticsRouter } from './analytics/routes.js';
+import { LoyaltyService } from './loyalty/service.js';
+import { createLoyaltyRouter } from './loyalty/routes.js';
+import { AIService } from './ai/service.js';
+import { createAIRouter } from './ai/routes.js';
 
 const env = z
   .object({
@@ -26,6 +38,12 @@ const env = z
 export const app = express();
 export const authService = new AuthService(defaultDb);
 export const paymentService = new PaymentService(defaultDb);
+export const gatewayService = new GatewayService(defaultDb);
+export const sessionService = new SessionService(defaultDb, gatewayService);
+export const notificationService = new NotificationService(defaultDb);
+export const analyticsService = new AnalyticsService(defaultDb);
+export const loyaltyService = new LoyaltyService(defaultDb);
+export const aiService = new AIService(defaultDb);
 export const authMiddleware = createAuthMiddleware(authService, defaultDb);
 
 app.disable('x-powered-by');
@@ -48,10 +66,17 @@ app.get('/api/v1/health', (_req, res) =>
       ownerDashboard: true,
       packageCatalog: true,
       couponEngine: true,
+      sessionEngine: true,
+      sessionStateClocks: true,
       paymentVerification: false,
       paymentAdapters: ['sandbox', 'manual_cash', 'signed_webhooks'],
+      gatewayAdapters: ['limited_owner', 'mock_test_gateway'],
       generalLedger: true,
       ledgerReconciliation: true,
+      notifications: true,
+      analyticsReporting: true,
+      customerLoyalty: true,
+      aiCopilotRegistry: true,
       hotspotEnforcement: false,
       perClientTrafficAccounting: false,
     },
@@ -73,9 +98,15 @@ app.get('/api/v1', (_req, res) =>
       'customers',
       'packages',
       'coupons',
+      'sessions',
+      'gateways',
       'payments',
       'ledger',
       'admin',
+      'notifications',
+      'analytics',
+      'loyalty',
+      'ai',
     ],
   })
 );
@@ -86,8 +117,14 @@ app.use('/api/v1/owner', authMiddleware, createOwnerRouter(defaultDb));
 app.use('/api/v1/customers', authMiddleware, createCustomerRouter(defaultDb));
 app.use('/api/v1/packages', authMiddleware, createPackageRouter(defaultDb));
 app.use('/api/v1/coupons', createCouponRouter(defaultDb, authMiddleware));
+app.use('/api/v1/sessions', createSessionRouter(defaultDb, sessionService, authMiddleware));
+app.use('/api/v1/gateways', createGatewayRouter(defaultDb, gatewayService, authMiddleware));
 app.use('/api/v1/payments', createPaymentRouter(defaultDb, paymentService, authMiddleware));
 app.use('/api/v1/admin', createAdminRouter(defaultDb, authService, authMiddleware));
+app.use('/api/v1/notifications', createNotificationRouter(notificationService, authMiddleware));
+app.use('/api/v1/analytics', createAnalyticsRouter(analyticsService, authMiddleware));
+app.use('/api/v1/loyalty', createLoyaltyRouter(loyaltyService, authMiddleware));
+app.use('/api/v1/ai', createAIRouter(aiService, authMiddleware));
 
 // 404 Fallback
 app.use((_req, res) =>
